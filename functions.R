@@ -18,7 +18,7 @@ CalculateNormalizedLearningGain = function(pre, post){
     post = c2
     pre = c1
     diff = post-pre
-    c2 = diff / (6-pre)
+    c2 = diff / (20-pre)
     
     c2
   }
@@ -54,7 +54,7 @@ mean_med_sd_prepostdelay <- function(data) {
   data %>% group_by(group) %>% summarise(
     pre_mean = mean(pre_score), pre_med = median(pre_score), pre_sd = sd(pre_score),
     post_mean = mean(post_score), post_med = median(post_score), post_sd = sd(post_score),
-    delay_mean = mean(delay_score), delay_med = median(delay_score), delay_sd = sd(delay_score),
+    #delay_mean = mean(delay_score), delay_med = median(delay_score), delay_sd = sd(delay_score),
     n())
 }
 mean_med_sd <- function(data, ...) {
