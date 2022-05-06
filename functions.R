@@ -54,7 +54,13 @@ mean_med_sd_prepostdelay <- function(data) {
   data %>% group_by(group) %>% summarise(
     pre_mean = mean(pre_score), pre_med = median(pre_score), pre_sd = sd(pre_score),
     post_mean = mean(post_score), post_med = median(post_score), post_sd = sd(post_score),
-    #delay_mean = mean(delay_score), delay_med = median(delay_score), delay_sd = sd(delay_score),
+    delay_mean = mean(delay_score), delay_med = median(delay_score), delay_sd = sd(delay_score),
+    n())
+}
+mean_med_sd_postdelay_nc <- function(data) {
+  data %>% group_by(group) %>% summarise(
+    post_mean = mean(post_nc), post_med = median(post_nc), post_sd = sd(post_nc),
+    delay_mean = mean(delay_nc), delay_med = median(delay_nc), delay_sd = sd(delay_nc),
     n())
 }
 mean_med_sd <- function(data, ...) {
