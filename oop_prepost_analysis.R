@@ -19,6 +19,9 @@ map_score_df <- within(map_score_df, rm('stid'))
 feedback_df <- read_csv("./feedback_count.csv", col_types=c('userid'='c'))
 timeOnTask <- read_csv("./time_on_task.csv", col_types=c('uid'='c'))
 
+pre_slfEfcy <- read_csv("./pre_selfEfficacy.csv", col_types=c('uid'='c'))
+post_slfEfcy <- read_csv("./post_selfEfficacy.csv", col_types=c('uid'='c'))
+
 question_data$group <- as.factor(question_data$group)
 question_data$type <- as.factor(question_data$type)
 
@@ -279,6 +282,12 @@ effsize::cohen.d(delay_nc ~ group, data=fdata)
 
 t_test(data = vars_wide[vars_wide$group=='cont',], formula = value ~ variable, paired = T)
 t_test(data = vars_wide[vars_wide$group=='exp',], formula = value ~ variable, paired = T)
+
+# raw score comparison
+t.test(cont_fdata(fdata)$pre_score, cont_fdata(fdata)$post_score, paired = T)
+t.test(cont_fdata(fdata)$post_score, cont_fdata(fdata)$delay_score, paired = T)
+t.test(exp_fdata(fdata)$pre_score, exp_fdata(fdata)$post_score, paired = T)
+t.test(exp_fdata(fdata)$post_score, exp_fdata(fdata)$delay_score, paired = T)
 
 #### Linear Regression Model
 # experimental group
