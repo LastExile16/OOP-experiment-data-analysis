@@ -19,9 +19,6 @@ map_score_df <- within(map_score_df, rm('stid'))
 feedback_df <- read_csv("./feedback_count.csv", col_types=c('userid'='c'))
 timeOnTask <- read_csv("./time_on_task.csv", col_types=c('uid'='c'))
 
-pre_slfEfcy <- read_csv("./pre_selfEfficacy.csv", col_types=c('uid'='c'))
-post_slfEfcy <- read_csv("./post_selfEfficacy.csv", col_types=c('uid'='c'))
-
 question_data$group <- as.factor(question_data$group)
 question_data$type <- as.factor(question_data$type)
 
@@ -32,12 +29,12 @@ any(is.na(question_data$group))
 which(is.na(question_data$group))
 
 # step 1: extract rows related to pre-post-delay and keep the needed columns
-ppd_raw <- question_data[question_data$type %in% c('pre','post'),c('userid', 'correct', 'type', 'group')]
+ppd_raw <- question_data[question_data$type %in% c('pre','post'),c('userid', 'user', 'correct', 'type', 'group')]
 ppd_raw$type <- factor(ppd_raw$type)
 head(ppd_raw)
 summary(ppd_raw)
 # step 2: use `group by` to format it as `wide data`
-ppd_grouped <- ppd_raw %>% group_by(group, userid, type)
+ppd_grouped <- ppd_raw %>% group_by(group, userid, user, type)
 ppd_grouped %>% summarise(test_score = sum(correct))
 # experiment_control_prePostDelay
 EC_ppd <- ppd_grouped %>% summarise(test_score = sum(correct), .groups = 'drop')
@@ -48,7 +45,10 @@ delay_score_df <- left_join(delay_score_df, EC_ppd%>%select(group, userid)%>%dis
 delay_score_df$type <- as.factor('delay')
 delay_score_df <- delay_score_df %>% relocate(group, uid, type, score, duration)
 tmp <- within(delay_score_df, rm('duration'))
-EC_ppd <- rbind(EC_ppd, setNames(tmp, names(EC_ppd))) %>% arrange(group, userid, type)
+user <- c(1:length(tmp$uid))
+tmp <- tibble::add_column(tmp, user, .after = 2)
+
+EC_ppd <- rbind(EC_ppd, setNames(tmp, names(EC_ppd))) %>% arrange(group, userid, user, type)
 summary(EC_ppd)
 
 # create some interested dataframes 
@@ -84,7 +84,7 @@ EnvStats::rosnerTest(EC_post[EC_post$group=='exp',]$test_score, k = 2)
 homogenity("test_score", "group", EC_pre)
 
 # transform all data to wide format
-fdata <- EC_ppd[EC_ppd$type == 'pre', c('group', 'userid', 'test_score')]
+fdata <- EC_ppd[EC_ppd$type == 'pre', c('group', 'userid', 'user', 'test_score')]
 fdata <- fdata %>% rename(pre_score = test_score)
 fdata <- left_join(fdata, EC_ppd[EC_ppd$type == 'post', c('userid', 'test_score')], by="userid")
 fdata <- fdata %>% rename(post_score = test_score)
@@ -100,6 +100,25 @@ fdata <- left_join(fdata, map_score_df, by=c("userid" = "uid"))
 
 ## join the feedback
 fdata <- left_join(fdata, feedback_df, by="userid")
+fdata <- fdata %>% mutate(feedbacks=replace(feedbacks, (is.na(feedbacks) & group == 'exp'), 0))
+
+# stid_to-uid for those who responded the self-efficacy as well as prepost test
+stid_to_uid <- read_csv("./stid_to_uid_those_who_participated_in_the_final_experiment.csv", col_types=c('uid'='c','stid'='c'))
+fdata <- left_join(fdata, stid_to_uid, by=c("userid" = "uid"))
+
+library(magrittr)
+#We can use the %<>% compound assignment operator from magrittr to change in place
+fdata %<>% mutate(stid = case_when((is.na(stid) & numeric.string(user)) ~ user, TRUE~stid))
+
+# below match is gained through xlsx file
+fdata[fdata$user=='stu67',]$stid = '1402017084'
+fdata[fdata$user=='stu72',]$stid = '1402020103'
+fdata[fdata$user=='stu76',]$stid = '1402020102'
+fdata[fdata$user=='stu79',]$stid = '1402020023'
+fdata[fdata$user=='stu80',]$stid = '1402020005'
+fdata[fdata$user=='stu94',]$stid = '1402018119'
+fdata[fdata$user=='stu100',]$stid =  '1402020095'
+fdata[fdata$user=='stu111',]$stid =  '1402018173'
 
 ## join the timeOnTask
 #fdata <- left_join(fdata, timeOnTask,  by=c("userid" = "uid"))
@@ -119,7 +138,7 @@ ggplot(exp_fdata(fdata), aes(x = pre_score, y = post_score)) +
 #guides(color = 'legend')
 #scale_shape_manual(values=c(4,6))
 
-# here, I filter out those having 10 or 0 in pre and post at the same time.
+# here, I filter out those having 20 or 0 in pre and post at the same time.
 fdata %>% select(userid, pre_score, post_score, group) %>%
   filter(!((pre_score==post_score)&(pre_score==20 | pre_score==0))) %>%
   mutate(diff=post_score-pre_score)
@@ -222,6 +241,42 @@ fdata <- fdata %>% filter(!userid %in% c('615','494', '563', '454'))
 summary(fdata)
 # after removing the two outliers per group, go back to for loop to re-draw the plots
 
+
+
+# check for more outliers
+outliers::grubbs.test(fdata[fdata$group=='exp',]$post_nc, type = 11, two.sided = T)
+outliers::grubbs.test(fdata[fdata$group=='cont',]$post_nc, type = 11, two.sided = T)
+# 578, 501
+min_out <- fdata %>% 
+  group_by(group) %>% 
+  slice_min(post_nc)
+# 574, 453
+max_out <- fdata %>% 
+  group_by(group) %>% 
+  slice_max(post_nc)
+fdata2 <- fdata %>% filter((!userid %in% min_out[,c('userid')]$userid) & (!userid %in% max_out[,c('userid')]$userid))
+summary(fdata2$group)
+fdata2 %>% group_by(group) %>% shapiro_test(vars = c('pre_score', 'post_score', 'post_nc', 'delay_score', 'delay_nc', 'map_score') )
+t.test(fdata2[fdata2$group=='cont',]$post_nc, fdata2[fdata2$group=='exp',]$post_nc, paired = F)
+t.test(fdata2[fdata2$group=='cont',]$delay_nc, fdata2[fdata2$group=='exp',]$delay_nc, paired = F)
+## repeat this section many times
+outliers::grubbs.test(fdata2[fdata2$group=='exp',]$post_nc, type = 11, two.sided = T)
+outliers::grubbs.test(fdata2[fdata2$group=='cont',]$post_nc, type = 11, two.sided = T)
+# 617, 478
+min_out <- fdata2 %>% 
+  group_by(group) %>% 
+  slice_min(post_nc)
+# 564, 599, 602
+max_out <- fdata2 %>% 
+  group_by(group) %>% 
+  slice_max(post_nc)
+fdata2 <- fdata2 %>% filter((!userid %in% min_out[,c('userid')]$userid) & (!userid %in% max_out[,c('userid')]$userid))
+summary(fdata2$group)
+fdata2 %>% group_by(group) %>% shapiro_test(vars = c('pre_score', 'post_score', 'post_nc', 'delay_score', 'delay_nc', 'map_score') )
+t.test(fdata2[fdata2$group=='cont',]$post_nc, fdata2[fdata2$group=='exp',]$post_nc, paired = F)
+t.test(fdata2[fdata2$group=='cont',]$delay_nc, fdata2[fdata2$group=='exp',]$delay_nc, paired = F)
+###########
+
 #### summary
 summarytools::stby(
   data = fdata,
@@ -247,6 +302,8 @@ ggplot(fdata, aes(x=group, y=delay_nc, fill=group)) +
 data <- fdata %>% select(c('userid','group', 'pre_score', 'post_score', 'delay_score')) %>% filter(!is.na(delay_score))
 data <- fdata %>% select(c('userid','group', 'pre_score', 'post_score'))
 
+
+data <- fdata %>% select(c('userid','group', 'post_ng', 'delay_ng')) %>% filter(!is.na(delay_ng))
 data <- fdata %>% select(c('userid','group', 'post_nc', 'delay_nc')) %>% filter(!is.na(delay_nc))
 
 vars_wide <- melt(data,id.vars = c('userid', 'group'))
@@ -267,17 +324,33 @@ p+geom_boxplot(width = 0.07, position = position_dodge(width = 0.9)) +
   xlab("") +
   ylab("Score")
 
+## after confirming normality of data
+## second condition is about equality of variances between the groups
+## for that do F-Tets
+res.ftest <- var.test(post_nc ~ group, data = fdata)
+res.ftest # significantly different
+res.ftest <- var.test(delay_nc ~ group, data = fdata)
+res.ftest # not diffirent
+
 #--
-t_test(data = fdata, formula = post_score ~ group, paired = F)
-t_test(data = fdata, formula = post_nc ~ group, paired = F)
+t_test(data = fdata, formula = post_score ~ group, paired = F, var.equal = T)
+
+t_test(data = fdata, formula = post_ng ~ group, paired = F, var.equal = F)
+t_test(data = fdata, formula = post_nc ~ group, paired = F, var.equal = F)
+#t.test(cont_fdata(fdata)$post_nc, cont_fdata(fdata)$delay_nc, paired = T)
+#t.test(exp_fdata(fdata)$post_nc, exp_fdata(fdata)$delay_nc, paired = T)
 
 # why difference in delay_nc is not significant while it is very similar to post_nc!!
-t_test(data = fdata, formula = delay_score ~ group, paired = F)
-t_test(data = fdata, formula = delay_nc ~ group, paired = F)
+t_test(data = fdata, formula = delay_score ~ group, paired = F, var.equal = T)
+t_test(data = fdata, formula = delay_ng ~ group, paired = F, var.equal = T)
+t_test(data = fdata, formula = delay_nc ~ group, paired = F, var.equal = T)
 
 
 effsize::cohen.d(post_nc ~ group, data=fdata)
+effsize::cohen.d(post_ng ~ group, data=fdata)
+
 effsize::cohen.d(delay_nc ~ group, data=fdata)
+effsize::cohen.d(delay_ng ~ group, data=fdata)
 
 
 t_test(data = vars_wide[vars_wide$group=='cont',], formula = value ~ variable, paired = T)
@@ -294,8 +367,8 @@ t.test(exp_fdata(fdata)$post_score, exp_fdata(fdata)$delay_score, paired = T)
 summary(lm(post_score ~ map_score+pre_score, data=exp_fdata(fdata)))
 summary(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)))
 
-summary(lm(delay_score ~ map_score+pre_score, data=exp_fdata(fdata)))
-summary(lm(delay_nc ~ map_score+pre_score, data=exp_fdata(fdata)))
+summary(lm(delay_score ~ map_score+pre_score+post_score, data=exp_fdata(fdata)))
+summary(lm(delay_nc ~ map_score+pre_score+post_score, data=exp_fdata(fdata)))
 
 lm_post_mapScore_exp <- lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata))
 summary(lm_post_mapScore_exp)
@@ -310,8 +383,8 @@ ggplot(exp_fdata(fdata), aes(x=map_score, y=post_nc)) +
 summary(lm(post_score ~ pre_score, data=cont_fdata(fdata)))
 summary(lm(post_nc ~ pre_score, data=cont_fdata(fdata)))
 
-summary(lm(delay_score ~ pre_score, data=cont_fdata(fdata)))
-summary(lm(delay_nc ~ pre_score, data=cont_fdata(fdata)))
+summary(lm(delay_score ~ pre_score+post_score, data=cont_fdata(fdata)))
+summary(lm(delay_nc ~ pre_score+post_score, data=cont_fdata(fdata)))
 
 
 #### Correlation
@@ -335,4 +408,20 @@ PerformanceAnalytics::chart.Correlation(exp_fdata(fdata)[,cols2], histogram=TRUE
 b <- Hmisc::rcorr(as.matrix(fdata[,cols1]))
 corrplot::corrplot(b$r, type="upper", order="hclust", 
                    p.mat = b$P, sig.level = 0.05, insig = "p-value")
-anova test ...
+
+###anova test ...
+# result is equalt to ttest with var.equal = T
+one.way <- aov(post_nc ~ group, data = fdata)
+summary(one.way)
+one.way <- aov(delay_nc ~ group, data = fdata)
+summary(one.way)
+
+two.way <- aov(post_nc ~ group + pre_score, data = fdata)
+
+summary(two.way)
+
+# MANOVA test
+res.man <- manova(cbind(post_nc, delay_nc) ~ group, data = fdata)
+summary(res.man)
+# Look to see which differ
+summary.aov(res.man)

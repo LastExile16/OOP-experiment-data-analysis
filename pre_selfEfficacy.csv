@@ -1,4 +1,4 @@
-Timestamp,name,uid,q1,q2,q3,q4,q5,q6,q7,q8,pre_eff_avg
+Timestamp,name,stid,q1,q2,q3,q4,q5,q6,q7,q8,pre_eff_avg
 2021/10/07 06:07:37 PM GMT+9,Shohibul Kahfi,1402019098,4,5,5,5,4,5,4,5,4.625
 2021/10/07 06:07:53 PM GMT+9,Khairan Ghithrif,1402020058,4,4,4,4,4,4,4,4,4
 2021/10/07 06:07:55 PM GMT+9,Muhammad Nanda Riono,1402019069,5,5,5,5,5,6,5,5,5.125
