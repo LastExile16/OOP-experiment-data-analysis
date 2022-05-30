@@ -14,8 +14,6 @@ delay_score_df <- read_csv("./delay_score.csv", col_types=c('uid'='c','stid'='c'
 delay_score_df <- na.omit(delay_score_df)
 delay_score_df <- within(delay_score_df, rm('stid', 'user', 'start_time'))
 delay_score_df$score <- delay_score_df$score/5
-map_score_df <- read_csv("./map_score.csv", col_types=c('uid'='c'))
-map_score_df <- within(map_score_df, rm('stid'))
 feedback_df <- read_csv("./feedback_count.csv", col_types=c('userid'='c'))
 timeOnTask <- read_csv("./time_on_task.csv", col_types=c('uid'='c'))
 
@@ -27,6 +25,11 @@ levels(question_data$group)
 summary(question_data)
 any(is.na(question_data$group))
 which(is.na(question_data$group))
+
+map_score_df <- read_csv("./map_score.csv", col_types=c('uid'='c'))
+map_score_df <- within(map_score_df, rm('stid'))
+any(duplicated(map_score_df$uid)) # user 477 is duplicated, I deleted it from the CSV file
+which(duplicated(map_score_df$uid))
 
 # step 1: extract rows related to pre-post-delay and keep the needed columns
 ppd_raw <- question_data[question_data$type %in% c('pre','post'),c('userid', 'user', 'correct', 'type', 'group')]
@@ -149,7 +152,7 @@ fdata <- fdata %>% mutate(diff=post_score-pre_score)
 fdata <- fdata %>% mutate(diff=replace(diff, ((pre_score==post_score)&(pre_score==20 | pre_score==0)), NA))
 
 fdata$post_nc <- with(fdata, ifelse(diff<0, diff / (fdata$pre_score), diff / (20-fdata$pre_score)))
-#### Normazlied gain - doesn't account for information loss
+#### Normazlied gain - biased toward low scores https://journals.aps.org/prper/pdf/10.1103/PhysRevPhysEducRes.16.010108
 fdata$post_ng <- fdata$diff / (20-fdata$pre_score)
 fdata[ is.infinite(fdata$post_ng),]$post_ng = NA
 
@@ -165,7 +168,7 @@ fdata <- fdata %>% mutate(diff=delay_score-pre_score)
 fdata <- fdata %>% mutate(diff=replace(diff, ((pre_score==delay_score)&(pre_score==20 | pre_score==0)), NA))
 
 fdata$delay_nc <- with(fdata, ifelse(diff<0, diff / (fdata$pre_score), diff / (20-fdata$pre_score)))
-#### Normazlied gain - doesn't account for information loss
+#### Normazlied gain - dbiased toward low scores
 fdata$delay_ng <- fdata$diff / (20-fdata$pre_score)
 fdata[ is.infinite(fdata$delay_ng),]$delay_ng = NA
 # remove column diff
@@ -189,6 +192,9 @@ x = pivot_longer(fdata[,c('userid', 'post_nc', 'delay_nc')], cols = c('post_nc',
 long = list(melt(fdata[,c('group', 'userid', 'pre_score', 'post_score', 'delay_score')], id.vars= c('group','userid')))
 long = append(long, list(melt(fdata[,c('group', 'userid', 'post_nc', 'delay_nc')], id.vars= c('group','userid'))))
 long[1]
+
+as.data.frame(long[1]) %>% group_by(variable, group) %>% summarise(count = n(), mean = mean(value, na.rm=T), sd = sd(value, na.rm = T))
+
 for (i in 1:2) {
   print(ggplot(as.data.frame(long[i]), aes (value)) +
     geom_density(aes(color = variable)) +
@@ -380,35 +386,40 @@ ggplot(exp_fdata(fdata), aes(x=map_score, y=post_nc)) +
   geom_abline(slope = coef(lm_post_mapScore_exp)[["map_score"]], 
               intercept = coef(lm_post_mapScore_exp)[["(Intercept)"]])
 # control group
-summary(lm(post_score ~ pre_score, data=cont_fdata(fdata)))
-summary(lm(post_nc ~ pre_score, data=cont_fdata(fdata)))
+summary(lm(post_score ~ pre_score+sm_score, data=cont_fdata(fdata)))
+summary(lm(post_nc ~ pre_score+sm_score, data=cont_fdata(fdata)))
 
-summary(lm(delay_score ~ pre_score+post_score, data=cont_fdata(fdata)))
-summary(lm(delay_nc ~ pre_score+post_score, data=cont_fdata(fdata)))
+summary(lm(delay_score ~ pre_score+post_score+sm_score, data=cont_fdata(fdata)))
+summary(lm(delay_nc ~ pre_score+post_score+sm_score, data=cont_fdata(fdata)))
 
 
 #### Correlation
 cor.test(exp_fdata(fdata)$post_score, exp_fdata(fdata)$map_score)
 
-cols1 <- c('pre_score', 'post_score', 'delay_score', 'post_nc', 'delay_nc')
+cols1 <- c('pre_score', 'post_score', 'delay_score', 'post_nc', 'delay_nc', 'sm_score', 'post_ng', 'delay_ng')
 corr.test(cont_fdata(fdata)[,cols1], method = "pearson", use = "pairwise.complete.obs")
 
-cols2 <- c('pre_score', 'post_score', 'delay_score', 'feedbacks', 'post_nc', 'delay_nc', 'map_score')
+cols2 <- c('pre_score', 'post_score', 'delay_score', 'feedbacks', 'post_nc', 'delay_nc', 'map_score', 'post_ng', 'delay_ng')
 corr.test(exp_fdata(fdata)[,cols2], method = "pearson", use = "pairwise.complete.obs")
 
 x <- corr.test(fdata[,cols1], method = "pearson", use = "pairwise.complete.obs")
 print(corr.p(x$r,n=39),short=FALSE)
 round(x$p, 5)
 
-#PerformanceAnalytics::chart.Correlation(cor(cont_fdata(fdata)[,cols], method = "pearson", use = "pairwise.complete.obs"), histogram=TRUE, pch=19)
-#PerformanceAnalytics::chart.Correlation(cor(exp_fdata(fdata)[,cols], method = "pearson", use = "pairwise.complete.obs"), histogram=TRUE, pch=19)
-PerformanceAnalytics::chart.Correlation(cont_fdata(fdata)[,cols1], histogram=TRUE, pch=19) + mtext("Summarization Group", side=3, line=3)
-PerformanceAnalytics::chart.Correlation(exp_fdata(fdata)[,cols2], histogram=TRUE, pch=19) + mtext("KB Group", side=3, line=3)
+
+#PerformanceAnalytics::chart.Correlation(cor(cont_fdata(fdata)[,cols1], method = "pearson", use = "pairwise.complete.obs"), histogram=TRUE, pch=19)
+#PerformanceAnalytics::chart.Correlation(cor(exp_fdata(fdata)[,cols2], method = "pearson", use = "pairwise.complete.obs"), histogram=TRUE, pch=19)
+PerformanceAnalytics::chart.Correlation(cont_fdata(fdata)[,cols1], method = "pearson", histogram=TRUE, pch=19) + mtext("Summarization Group", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(cont_fdata(fdata)[,cols1], method = "spearman", histogram=TRUE, pch=19) + mtext("Summarization Group", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(exp_fdata(fdata)[,cols2], method = "pearson", histogram=TRUE, pch=19) + mtext("KB Group", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(exp_fdata(fdata)[,cols2], method = "spearman", histogram=TRUE, pch=19) + mtext("KB Group", side=3, line=3)
 
 b <- Hmisc::rcorr(as.matrix(fdata[,cols1]))
 corrplot::corrplot(b$r, type="upper", order="hclust", 
                    p.mat = b$P, sig.level = 0.05, insig = "p-value")
 
+WHAT ABOUT THE CORRELATION IN MIDTERM AND SO ON
+WHAT about the dropout rate between the groups
 ###anova test ...
 # result is equalt to ttest with var.equal = T
 one.way <- aov(post_nc ~ group, data = fdata)
@@ -425,3 +436,11 @@ res.man <- manova(cbind(post_nc, delay_nc) ~ group, data = fdata)
 summary(res.man)
 # Look to see which differ
 summary.aov(res.man)
+
+#### Summarization score
+smgroup_score <- read_csv("./sm_score.csv", col_types=c('stid'='c'))
+fdata <- left_join(fdata, smgroup_score, by='stid')
+fdata <- fdata %>% mutate(activity_score = ifelse(!is.na(map_score), map_score, sm_score))
+count(fdata[is.na(fdata$activity_score),])
+fdata[ is.na(fdata$activity_score),]$activity_score = 0
+
