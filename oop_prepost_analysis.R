@@ -299,7 +299,12 @@ homogenity("pre_score", "group", fdata)
 ggplot(fdata, aes(x=group, y=post_nc, fill=group)) + 
   geom_boxplot() +
   stat_summary(fun=mean, colour="darkred", geom="point", 
-               shape=18, size=3, show.legend=FALSE)
+               shape=18, size=3, show.legend=FALSE) +
+  annotate(
+    "text", label = "P-value = 0.0399",
+    x = 2, y = 0.8, size = 4, colour = "red"
+  )
+
 ggplot(fdata, aes(x=group, y=delay_nc, fill=group)) + 
   geom_boxplot() +
   stat_summary(fun=mean, colour="darkred", geom="point", 
@@ -329,6 +334,17 @@ p <- ggplot(vars_wide, aes(x=variable, y=value, fill=group)) +
 p+geom_boxplot(width = 0.07, position = position_dodge(width = 0.9)) +
   xlab("") +
   ylab("Score")
+
+vars_wide_postnc <- vars_wide[vars_wide$variable != 'delay_nc',]
+vars_wide_postnc$group <- ifelse(vars_wide_postnc$group=='cont', 'Summarization', 'CRS')
+p <- ggboxplot(vars_wide_postnc, x="group", y="value",
+                 palette = "jco", legend = "none") +
+                xlab("") +  ylab("Post Normalized Gain")
+# Change method
+p + stat_compare_means(method = "t.test", label.x = 1.5)
+
+compare_means(value ~ group, data = vars_wide_postnc, paired = F, method = "t.test")
+
 
 ## after confirming normality of data
 ## second condition is about equality of variances between the groups
@@ -373,6 +389,15 @@ t.test(exp_fdata(fdata)$post_score, exp_fdata(fdata)$delay_score, paired = T)
 summary(lm(post_score ~ map_score+pre_score, data=exp_fdata(fdata)))
 summary(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)))
 
+
+tab_model(glm(post_nc ~ activity_score+pre_score+group, data=fdata))
+# prior knowledge (pre_score) affects the post score most significantly,
+# and then comes the activity score which means students prior knowledge is most
+# important to learn the material.
+# the group is not significant means the scores for both groups are reliable because
+# the difference in score doesn't make difference in post score
+tab_model(glm(post_score ~ activity_score+pre_score+group, data=fdata))
+
 summary(lm(delay_score ~ map_score+pre_score+post_score, data=exp_fdata(fdata)))
 summary(lm(delay_nc ~ map_score+pre_score+post_score, data=exp_fdata(fdata)))
 
@@ -386,12 +411,18 @@ ggplot(exp_fdata(fdata), aes(x=map_score, y=post_nc)) +
   geom_abline(slope = coef(lm_post_mapScore_exp)[["map_score"]], 
               intercept = coef(lm_post_mapScore_exp)[["(Intercept)"]])
 # control group
-summary(lm(post_score ~ pre_score+sm_score, data=cont_fdata(fdata)))
+lm_post_pre_cont <- lm(post_score ~ pre_score+sm_score, data=cont_fdata(fdata))
+summary(lm_post_pre_cont)
 summary(lm(post_nc ~ pre_score+sm_score, data=cont_fdata(fdata)))
 
 summary(lm(delay_score ~ pre_score+post_score+sm_score, data=cont_fdata(fdata)))
 summary(lm(delay_nc ~ pre_score+post_score+sm_score, data=cont_fdata(fdata)))
 
+plot(cont_fdata(fdata)$pre_score, cont_fdata(fdata)$post_score)
+abline(lm_post_pre_cont)
+plot(cont_fdata(fdata)$pre_score, cont_fdata(fdata)$post_nc)
+
+plot(cont_fdata(fdata)$sm_score, cont_fdata(fdata)$post_nc)
 
 #### Correlation
 cor.test(exp_fdata(fdata)$post_score, exp_fdata(fdata)$map_score)
@@ -439,7 +470,29 @@ summary.aov(res.man)
 
 #### Summarization score
 smgroup_score <- read_csv("./sm_score.csv", col_types=c('stid'='c'))
-fdata <- left_join(fdata, smgroup_score, by='stid')
+
+library(irr)
+smScoreKappaCoeff <- kappam.fleiss(smgroup_score[,c('sm_score_hanna', 'sm_score_ulpa')])
+smScoreKappaCoeff
+#for (i in 1:8) {
+#  print(smScoreKappaCoeff[i])
+#}
+
+#hanna_score <- openxlsx::read.xlsx("./summary answer/PBO.21.22.1-Sumarisasi-jawaban_ENG_Nilai_Hanna.xlsx", 'PBO.21.22.1 Sumarisasi', startRow=2, cols = c(2, 13:22))
+#ulpa_score <- openxlsx::read.xlsx("./summary answer/PBO.21.22.1-Sumarisasi-jawaban_ENG_ulpa.xlsx", 'PBO.21.22.1 Sumarisasi', startRow=2, cols = c(2, 13:22))
+#names(hanna_score)
+#names(ulpa_score)
+
+#for (i in 2:11) {
+#  print(i)
+#  print(names(hanna_score)[i])
+#  print(kappam.fleiss(cbind(hanna_score[,i], ulpa_score[,i]))['value'])
+#}
+
+#cbind(hanna_score[,1] - ulpa_score[,1])
+#cbind(hanna_score[,8] - ulpa_score[,8])
+
+fdata <- left_join(fdata, smgroup_score[,c('stid', 'sm_score')], by='stid')
 fdata <- fdata %>% mutate(activity_score = ifelse(!is.na(map_score), map_score, sm_score))
 count(fdata[is.na(fdata$activity_score),])
 fdata[ is.na(fdata$activity_score),]$activity_score = 0
