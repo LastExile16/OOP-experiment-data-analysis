@@ -66,3 +66,5 @@ ggplot(questions3, aes(x = forcats::fct_inorder(as.factor(qid)), y=diff, width=.
 
 summary(lm(qid ~ diff, data=questions_wide))
 
+write.csv(questions_wide, "./questions_wide.csv", row.names = F)
+
