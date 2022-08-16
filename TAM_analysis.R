@@ -31,6 +31,13 @@ tam_data$bi <- rowMeans(tam_data[, c('Q14','Q15')])
 tam_data$c <- rowMeans(tam_data[, c('Q16','Q17','Q18')])
 tam_data$e <- rowMeans(tam_data[, c('Q19','Q20', 'Q21')])
 
+# someone on researchgate says that the correlation should not exceed r=0.70!
+PerformanceAnalytics::chart.Correlation(pu, method = "pearson", histogram=F, pch=19, cex.font = 50) + mtext("TAM-PU Interrelationship", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(peou, method = "pearson", histogram=F, pch=19, cex.font = 50) + mtext("TAM-PU Interrelationship", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(at, method = "pearson", histogram=F, pch=19, cex.font = 50) + mtext("TAM-PU Interrelationship", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(c, method = "pearson", histogram=F, pch=19, cex.font = 50) + mtext("TAM-PU Interrelationship", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(e, method = "pearson", histogram=F, pch=19, cex.font = 50) + mtext("TAM-PU Interrelationship", side=3, line=3)
+PerformanceAnalytics::chart.Correlation(bi, method = "pearson", histogram=F, pch=19, cex.font = 50) + mtext("TAM-PU Interrelationship", side=3, line=3)
 par(mfrow=c(2,3))
 
 hist(tam_data$pu)

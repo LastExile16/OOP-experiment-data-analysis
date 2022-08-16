@@ -77,6 +77,14 @@ pu_longSumm <- pu_long %>%
     vlabel == "Strongly Disagree" ~ "#000000",
     TRUE ~ "#ffffff"
   ))
+pu_longSumm2 <- pu_long %>%
+  group_by(vlabel) %>%
+  summarize(count = length(stid), mean = mean(value)) %>%
+  mutate(freq = count / sum(count)) %>%
+  mutate(textColor = case_when(
+    vlabel == "Strongly Disagree" ~ "#000000",
+    TRUE ~ "#ffffff"
+  ))
 pu_longSumm
 pu_longSumm$variable <- reorder(pu_longSumm$variable, (pu_longSumm$freq * pu_longSumm$count), mean)
 pu_longSumm$count <- ifelse(pu_longSumm$count > 2, pu_longSumm$count, "")
@@ -444,3 +452,40 @@ plotLegend
 plotAll <- ggarrange(plotpu, plotpeou, plotat, plotbi, plotc, plote, common.legend = TRUE, legend = "right")
 annotate_figure(plotAll, left = "Questions")
 
+
+puq1 <- pu_longSumm[pu_longSumm$variable=='Q1',]
+puq1 %>% filter(vlabel %in% c('Agree', 'Extremely agree', 'Somewhat agree')) %>% mutate(sum = sum(freq))
+puq1 %>% filter(vlabel %in% c('Disagree', 'Extremely disagree', 'Somewhat disagree')) %>% mutate(sum = sum(freq))
+puq1 %>% filter(vlabel %in% c('Neither agree nor disagree')) %>% mutate(sum = sum(freq))
+
+puq2 <- pu_longSumm[pu_longSumm$variable=='Q2',]
+puq2 %>% filter(vlabel %in% c('Agree', 'Extremely agree', 'Somewhat agree')) %>% mutate(sum = sum(freq))
+puq2 %>% filter(vlabel %in% c('Disagree', 'Extremely disagree', 'Somewhat disagree')) %>% mutate(sum = sum(freq))
+puq2 %>% filter(vlabel %in% c('Neither agree nor disagree')) %>% mutate(sum = sum(freq))
+
+puq3 <- pu_longSumm[pu_longSumm$variable=='Q3',]
+puq3 %>% filter(vlabel %in% c('Agree', 'Extremely agree', 'Somewhat agree')) %>% mutate(sum = sum(freq))
+puq3 %>% filter(vlabel %in% c('Disagree', 'Extremely disagree', 'Somewhat disagree')) %>% mutate(sum = sum(freq))
+puq3 %>% filter(vlabel %in% c('Neither agree nor disagree')) %>% mutate(sum = sum(freq))
+
+puq4 <- pu_longSumm[pu_longSumm$variable=='Q4',]
+puq4 %>% filter(vlabel %in% c('Agree', 'Extremely agree', 'Somewhat agree')) %>% mutate(sum = sum(freq))
+puq4 %>% filter(vlabel %in% c('Disagree', 'Extremely disagree', 'Somewhat disagree')) %>% mutate(sum = sum(freq))
+puq4 %>% filter(vlabel %in% c('Neither agree nor disagree')) %>% mutate(sum = sum(freq))
+
+puq5 <- pu_longSumm[pu_longSumm$variable=='Q5',]
+puq5 %>% filter(vlabel %in% c('Agree', 'Extremely agree', 'Somewhat agree')) %>% mutate(sum = sum(freq))
+puq5 %>% filter(vlabel %in% c('Disagree', 'Extremely disagree', 'Somewhat disagree')) %>% mutate(sum = sum(freq))
+puq5 %>% filter(vlabel %in% c('Neither agree nor disagree')) %>% mutate(sum = sum(freq))
+
+
+# Q1: 41 a, 29 D, 29 N
+# Q2: 59 A, 20 D, 20 N
+# Q3: 53 A, 14 D, 32 N
+# Q4: 47 A, 23 D, 29 N
+# Q5: 47 A, 18 D, 35 N
+
+pu_longSumm %>% ungroup() %>% filter(vlabel %in% c('Agree', 'Extremely agree', 'Somewhat agree')) %>% mutate(sum = sum(freq)/5)
+pu_longSumm %>% ungroup() %>% filter(vlabel %in% c('Disagree', 'Extremely disagree', 'Somewhat disagree')) %>% mutate(sum = sum(freq)/5)
+pu_longSumm %>% ungroup() %>% filter(vlabel %in% c('Neither agree nor disagree')) %>% mutate(sum = sum(freq)/5)
+pu_longSumm %>% ungroup() %>% mutate(sum = sum(freq))
