@@ -180,6 +180,7 @@ fdata %>% drop_na(delay_score) %>% mean_med_sd_postdelay_nc()
 fdata %>% mean_med_sd_prepostdelay()
 fdata %>% drop_na(delay_score) %>% mean_med_sd_prepostdelay()
 
+fdata %>% mean_med_sd("pre_score", "post_score", "post_nc")
 # for cont: delay_score, pre_score are NOT normal
 # for exp: delay_score, map_score are NOT normal
 fdata %>% group_by(group) %>% shapiro_test(vars = c('pre_score', 'post_score', 'post_nc', 'delay_score', 'delay_nc', 'map_score') )
@@ -231,7 +232,8 @@ summary(no_outlier_postnc) # two people removed
 summary(fdata[fdata$group=='cont',c('userid','group', 'post_nc')])
 boxplot(no_outlier_postnc$post_nc, fdata[fdata$group=='exp',]$post_nc)
 t.test(no_outlier_postnc$post_nc, fdata[fdata$group=='exp',]$post_nc, paired = F)
-t.test(fdata[fdata$group=='cont',]$post_nc, fdata[fdata$group=='exp',]$post_nc, paired = F)
+t_test(post_nc~group, data=fdata, paired = F)
+summary(fdata$group)
 
 # 615, 494
 fdata %>% 
@@ -263,8 +265,8 @@ max_out <- fdata %>%
 fdata2 <- fdata %>% filter((!userid %in% min_out[,c('userid')]$userid) & (!userid %in% max_out[,c('userid')]$userid))
 summary(fdata2$group)
 fdata2 %>% group_by(group) %>% shapiro_test(vars = c('pre_score', 'post_score', 'post_nc', 'delay_score', 'delay_nc', 'map_score') )
-t.test(fdata2[fdata2$group=='cont',]$post_nc, fdata2[fdata2$group=='exp',]$post_nc, paired = F)
-t.test(fdata2[fdata2$group=='cont',]$delay_nc, fdata2[fdata2$group=='exp',]$delay_nc, paired = F)
+t_test(post_nc~group, data=fdata2, paired = F)
+t_test(delay_nc~group, data=fdata2, paired = F)
 ## repeat this section many times
 outliers::grubbs.test(fdata2[fdata2$group=='exp',]$post_nc, type = 11, two.sided = T)
 outliers::grubbs.test(fdata2[fdata2$group=='cont',]$post_nc, type = 11, two.sided = T)
@@ -279,8 +281,8 @@ max_out <- fdata2 %>%
 fdata2 <- fdata2 %>% filter((!userid %in% min_out[,c('userid')]$userid) & (!userid %in% max_out[,c('userid')]$userid))
 summary(fdata2$group)
 fdata2 %>% group_by(group) %>% shapiro_test(vars = c('pre_score', 'post_score', 'post_nc', 'delay_score', 'delay_nc', 'map_score') )
-t.test(fdata2[fdata2$group=='cont',]$post_nc, fdata2[fdata2$group=='exp',]$post_nc, paired = F)
-t.test(fdata2[fdata2$group=='cont',]$delay_nc, fdata2[fdata2$group=='exp',]$delay_nc, paired = F)
+t_test(post_nc~group, data=fdata2, paired = F)
+t_test(delay_nc~group, data=fdata2, paired = F)
 ###########
 
 #### summary
@@ -304,6 +306,19 @@ ggplot(fdata, aes(x=group, y=post_nc, fill=group)) +
     "text", label = "P-value = 0.0399",
     x = 2, y = 0.8, size = 4, colour = "red"
   )
+
+tmpdata <- fdata                     # Duplicate data
+levels(tmpdata$group) <- c("SUM",  # Relevel factor labels
+                                       "CRS")
+ggplot(tmpdata, aes(x=group, y=post_nc)) + 
+  geom_boxplot() + theme_bw() +
+  stat_summary(fun=mean, colour="black", geom="point", 
+               shape=2, size=2, show.legend=FALSE) +
+  stat_compare_means(method = "t.test", label =  "p.signif", label.x = 1.99, size=7) +
+  xlab("") +
+  ylab("Normalized Change Score")
+
+remove(tmpdata)
 
 ggplot(fdata, aes(x=group, y=delay_nc, fill=group)) + 
   geom_boxplot() +
@@ -343,6 +358,9 @@ p <- ggboxplot(vars_wide_postnc, x="group", y="value",
 # Change method
 p + stat_compare_means(method = "t.test", label.x = 1.5)
 
+# the value in this test is very different from ttest of fdata because this test 
+# uses vars_wide_postnc of students who participated in pre-post and delay test equally
+# the difference lies in excluding two students from experiment group
 compare_means(value ~ group, data = vars_wide_postnc, paired = F, method = "t.test")
 
 
@@ -384,11 +402,25 @@ t.test(cont_fdata(fdata)$post_score, cont_fdata(fdata)$delay_score, paired = T)
 t.test(exp_fdata(fdata)$pre_score, exp_fdata(fdata)$post_score, paired = T)
 t.test(exp_fdata(fdata)$post_score, exp_fdata(fdata)$delay_score, paired = T)
 
+effsize::cohen.d(cont_fdata(fdata)$post_score, cont_fdata(fdata)$pre_score)
+effsize::cohen.d(exp_fdata(fdata)$post_score, exp_fdata(fdata)$pre_score)
+
+# Common Language Effect Size
+#An interesting, though not often used, interpretation of differences between groups can be provided by the common language effect size (McGraw and Wong, 1992), also known as the probability of superiority (Grissom and Kim, 2005), which is a more intuitively understandable statistic than Cohen's d or r. It can be calculated directly from Cohen's d, converts the effect size into a percentage, and expresses the probability that a randomly sampled person from one group will have a higher observed measurement than a randomly sampled person from the other group (for between designs) or (for within-designs) the probability that an individual has a higher value on one measurement than the other. 
+#https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3840331/#:~:text=An%20interesting%2C%20though,than%20the%20other.
+# pnorm(d / sqrt(2))
+canprot::CLES(cont_fdata(fdata)$pre_score, cont_fdata(fdata)$post_score)
+
+canprot::CLES(exp_fdata(fdata)$pre_score, exp_fdata(fdata)$post_score)
+# [1] 0.6786666
+canprot::CLES(cont_fdata(fdata)$post_nc, exp_fdata(fdata)$post_nc)
+#[1] 0.6320122
+
 #### Linear Regression Model
 # experimental group
 summary(lm(post_score ~ map_score+pre_score, data=exp_fdata(fdata)))
-summary(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)))
-
+sjPlot::tab_model(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)), p.style = "numeric_stars")
+ 
 
 tab_model(glm(post_nc ~ activity_score+pre_score+group, data=fdata))
 # prior knowledge (pre_score) affects the post score most significantly,
@@ -406,7 +438,7 @@ summary(lm_post_mapScore_exp)
 plot(exp_fdata(fdata)$map_score, exp_fdata(fdata)$post_nc)
 abline(lm_post_mapScore_exp)
 
-ggplot(exp_fdata(fdata), aes(x=map_score, y=post_nc)) + 
+ggplot(exp_fdata(fdata), aes(x=map_score, y=post_nc*100)) + 
   geom_point() +
   geom_abline(slope = coef(lm_post_mapScore_exp)[["map_score"]], 
               intercept = coef(lm_post_mapScore_exp)[["(Intercept)"]])
@@ -458,7 +490,7 @@ summary(one.way)
 one.way <- aov(delay_nc ~ group, data = fdata)
 summary(one.way)
 
-two.way <- aov(post_nc ~ group + pre_score, data = fdata)
+two.way <- aov(delay_nc ~ group + pre_score, data = fdata)
 
 summary(two.way)
 
@@ -496,4 +528,59 @@ fdata <- left_join(fdata, smgroup_score[,c('stid', 'sm_score')], by='stid')
 fdata <- fdata %>% mutate(activity_score = ifelse(!is.na(map_score), map_score, sm_score))
 count(fdata[is.na(fdata$activity_score),])
 fdata[ is.na(fdata$activity_score),]$activity_score = 0
+
+
+
+
+# Histogram
+hist(fdata$map_score, breaks = 10, prob = TRUE,
+     col = "white",
+     main = "")
+
+# Add new plot
+par(new = TRUE)
+
+# Box plot
+boxplot(fdata$map_score, horizontal = TRUE, axes = FALSE,
+        col = rgb(0, 0.8, 1, alpha = 0.5))
+
+sjPlot::tab_model(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)), p.style = "numeric_stars")
+summary(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)))
+apaTables::apa.reg.boot.table(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)))
+sjPlot::tab_model(lm(post_nc ~ sm_score+pre_score, data=cont_fdata(fdata)), p.style = "numeric_stars")
+summary(lm(post_nc ~ sm_score+pre_score, data=cont_fdata(fdata)))
+apaTables::apa.reg.boot.table(lm(post_nc ~ sm_score+pre_score, data=cont_fdata(fdata)))
+texreg::texreg(lm(post_nc ~ sm_score+pre_score, data=cont_fdata(fdata)), booktabs = TRUE, dcolumn = TRUE)
+
+apaTables::apa.reg.boot.table(lm(post_nc ~ map_score+pre_score, data=exp_fdata(fdata)),lm(post_nc ~ sm_score+pre_score, data=cont_fdata(fdata)), filename = "regression")
+
+xxx <- aov(formula = delay_nc ~ post_nc+group, data=fdata)
+Anova(xxx, type="III")
+# ANCOVA: after controlling for post_nc we want to see if the difference in 
+# delay is because of groups. results show it is not.
+#Anova Table (Type III tests)
+
+#Response: delay_nc
+#Sum Sq Df F value    Pr(>F)    
+#(Intercept) 1.2924  1 14.9703 0.0002422 ***
+#  post_nc     1.5779  1 18.2784 5.924e-05 ***
+#  group       0.0002  1  0.0023 0.9620393    
+#Residuals   6.0430 70 
+
+
+# write.csv(fdata, "./fdata.csv", row.names = F)
+
+#### two way ANOVA
+#https://statistics.laerd.com/spss-tutorials/two-way-anova-using-spss-statistics.php#:~:text=The%20two%2Dway%20ANOVA%20compares,variables%20on%20the%20dependent%20variable.
+#https://mcn-www.jwu.ac.jp/~kuto/kogo_lab/psi-home/stat2000/DATA/07/09.HTM
+#http://www.sthda.com/english/wiki/two-way-anova-test-in-r
+#dose=time
+#sup=group
+#len=learning-gain
+
+fdata_long <- melt(fdata[,c('userid', 'group', 'post_nc', 'delay_nc')], id.vars= c('group','userid'), na.rm = T)
+fdata_long <- melt(fdata[!is.na(fdata$delay_nc),c('userid', 'group', 'post_nc', 'delay_nc')], id.vars= c('group','userid'))
+names(fdata_long) <- c('group', "userid", 'time', 'learning-gain')
+table(fdata_long$group, fdata_long$time)
+ggboxplot(fdata_long, x = "time", y = "learning-gain", color = "group", palette = c("#00AFBB", "#E7B800"))
 
