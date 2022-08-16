@@ -574,7 +574,7 @@ Anova(xxx, type="III")
 #https://statistics.laerd.com/spss-tutorials/two-way-anova-using-spss-statistics.php#:~:text=The%20two%2Dway%20ANOVA%20compares,variables%20on%20the%20dependent%20variable.
 #https://mcn-www.jwu.ac.jp/~kuto/kogo_lab/psi-home/stat2000/DATA/07/09.HTM
 #http://www.sthda.com/english/wiki/two-way-anova-test-in-r
-#dose=time
+#time=time
 #sup=group
 #len=learning-gain
 
@@ -582,5 +582,77 @@ fdata_long <- melt(fdata[,c('userid', 'group', 'post_nc', 'delay_nc')], id.vars=
 fdata_long <- melt(fdata[!is.na(fdata$delay_nc),c('userid', 'group', 'post_nc', 'delay_nc')], id.vars= c('group','userid'))
 names(fdata_long) <- c('group', "userid", 'time', 'learning-gain')
 table(fdata_long$group, fdata_long$time)
+
+# Box plot with multiple groups
+# +++++++++++++++++++++
+# Plot learning-gain by groups ("time")
+# Color box plot by a second group: "group"
 ggboxplot(fdata_long, x = "time", y = "learning-gain", color = "group", palette = c("#00AFBB", "#E7B800"))
+
+# Line plots with multiple groups
+# +++++++++++++++++++++++
+# Plot learning-gain by groups ("time")
+# Color box plot by a second group: "group"
+# Add error bars: mean_se
+# (other values include: mean_sd, mean_ci, median_iqr, ....)
+ggline(fdata_long, x = "time", y = "learning-gain", color = "group",
+       add = c("mean_se"),
+       palette = c("#00AFBB", "#E7B800"))
+#R Base functions:
+boxplot(`learning-gain` ~ group * time, data=fdata_long, frame = FALSE, 
+        col = c("#00AFBB", "#E7B800"), ylab="learning-gain")
+# Two-way interaction plot
+interaction.plot(x.factor = fdata_long$time, trace.factor = fdata_long$group, 
+                 response = fdata_long$`learning-gain`, fun = mean, 
+                 type = "b", legend = TRUE, 
+                 xlab = "time", ylab="learning-gain",
+                 pch=c(1,19), col = c("#00AFBB", "#E7B800"))
+
+# We want to know if learning-gain depends on group and time.
+res.aov2 <- aov(`learning-gain` ~ group + time, data = fdata_long)
+summary(res.aov2)
+#               Df   Sum-Sq   Mean-Sq   F-value  Pr(>F)  
+# group         1    0.600    0.5996    6.280    0.0133 *
+# time          1    0.389    0.3888    4.073    0.0455 *
+# Residuals    143  13.652    0.0955   
+# ---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+
+# From the ANOVA table above, we can conclude that both group and time are statistically significant. 
+# group is the most significant factor variable. These results would lead us to believe that 
+# changing time or the group, will impact significantly the mean learning-gain.
+
+# Not the above fitted model is called additive model. 
+# It makes an assumption that the two factor variables are independent. 
+# If you think that these two variables might interact to create an synergistic effect, 
+# replace the plus symbol (+) by an asterisk (*), as follow.
+
+# Two-way ANOVA with interaction effect
+res.aov3 <- aov(`learning-gain` ~ group*time, data = fdata_long)
+summary(res.aov3)
+
+#              Df    Sum-Sq   Mean-Sq    F value   Pr(>F)  
+# group         1    0.600    0.5996     6.262     0.0135 *
+# time          1    0.389    0.3888     4.061     0.0458 *
+# group:time    1    0.055    0.0552     0.577     0.4488  
+# Residuals   142   13.597    0.0958 
+# It can be seen that the two main effects (group and time) are statistically significant, but not their interaction.
+# Note that, in the situation where the interaction is not significant you should use the additive model.
+
+# From the ANOVA results, you can conclude the following, based on the p-values and a significance level of 0.05:
+  
+# the p-value of group is 0.0135 (significant), which indicates that the groups are associated with significant different in learning-gain.
+# the p-value of time is 0.0458 (significant), which indicates that the times (after class and after one week) are associated with significant different learning-gain.
+# the p-value for the interaction between group*time is 0.44 (not significant). in case of significant difference: it indicates that the relationships between time and learning-gain depends on the group.
+
+# summary statistics
+group_by(fdata_long, group, time) %>%
+  summarise(
+    count = n(),
+    mean = mean(`learning-gain`, na.rm = TRUE),
+    sd = sd(`learning-gain`, na.rm = TRUE)
+  )
+
+model.tables(res.aov3, type="means", se = TRUE)
 
